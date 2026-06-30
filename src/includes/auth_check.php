@@ -8,7 +8,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 /* ===== LOAD INIT (DB + route helper) ===== */
-require_once "db.php";
+require_once __DIR__ . '/../shared/db.php';
 
 /* ===== LOGIN CHECK ===== */
 if (!isset($_SESSION['user_phone'])) {

@@ -1,6 +1,6 @@
 <?php
 session_start();
-include "db.php";
+require_once __DIR__ . '/../shared/db.php';
 
 if (!isset($_SESSION['user'])) {
     header("Location: login.php");
