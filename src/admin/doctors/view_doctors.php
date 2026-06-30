@@ -1,27 +1,19 @@
 <?php
 session_start();
-include "db.php";
+require_once __DIR__ . '/../shared/db.php';
 
 if (!isset($_SESSION['user'])) {
     header("Location: login.php");
     exit();
 }
 
-/* ================= GET USER ================= */
-$user = $_SESSION['user'];
-
-/* ================= FETCH HOSPITALS ================= */
-$res = $conn->query("
-    SELECT *
-    FROM mc_hospital
-    ORDER BY hospital_name ASC
-");
+$res = $conn->query("SELECT * FROM doctor_table ORDER BY first_name ASC");
 ?>
 
 <!DOCTYPE html>
 <html>
 <head>
-<title>Hospitals Dashboard</title>
+<title>Doctors Directory</title>
 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
@@ -50,8 +42,8 @@ body{
     padding:14px 18px;
     background:#fff;
     border-bottom:1px solid #e9e9e9;
-    position:relative;
     box-shadow:0 2px 10px rgba(0,0,0,0.04);
+    position:relative;
 }
 
 .logo{
@@ -77,7 +69,7 @@ body{
     color:#777;
 }
 
-/* ================= MENU BUTTON ================= */
+/* ================= MENU ================= */
 
 .menu-btn{
     font-size:28px;
@@ -90,7 +82,7 @@ body{
     background:#f0f0f0;
 }
 
-/* ================= PAGE HEADER ================= */
+/* ================= PAGE TITLE ================= */
 
 .page-header{
     text-align:center;
@@ -114,73 +106,85 @@ body{
     margin:auto;
     padding:20px;
     display:grid;
-    grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
-    gap:20px;
+    grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+    gap:22px;
 }
 
-/* ================= CARD ================= */
+/* ================= DOCTOR CARD (NEW STYLE) ================= */
 
 .card{
     background:#fff;
-    border-radius:18px;
+    border-radius:20px;
     padding:20px;
-    box-shadow:0 10px 25px rgba(0,0,0,0.06);
+    box-shadow:0 12px 30px rgba(0,0,0,0.06);
     border:1px solid #f1f1f1;
-    transition:.25s ease;
+    transition:0.25s ease;
+    position:relative;
+    overflow:hidden;
 }
 
 .card:hover{
-    transform:translateY(-5px);
-    box-shadow:0 14px 30px rgba(0,0,0,0.10);
+    transform:translateY(-6px);
+    box-shadow:0 18px 40px rgba(0,0,0,0.12);
 }
 
-.hospital-name{
-    font-size:18px;
+/* top accent bar */
+.card::before{
+    content:"";
+    position:absolute;
+    top:0;
+    left:0;
+    width:100%;
+    height:5px;
+    background:linear-gradient(90deg,#0d6efd,#6f42c1);
+}
+
+/* avatar circle */
+.avatar{
+    width:60px;
+    height:60px;
+    border-radius:50%;
+    background:linear-gradient(135deg,#0d6efd,#6f42c1);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:#fff;
     font-weight:700;
-    margin-bottom:8px;
-}
-
-.location{
-    font-size:14px;
-    color:#666;
+    font-size:18px;
     margin-bottom:12px;
 }
 
-/* ================= BADGES ================= */
+/* name */
+.doctor-name{
+    font-size:18px;
+    font-weight:800;
+    margin-bottom:6px;
+}
 
-.fee{
-    display:inline-block;
-    background:#eef6ff;
-    color:#0d6efd;
-    padding:8px 12px;
-    border-radius:30px;
-    font-weight:600;
+/* hospital */
+.hospital{
     font-size:13px;
-    margin-bottom:12px;
+    color:#666;
+    margin-bottom:10px;
 }
 
-.status{
+/* specialization badge */
+.specialization{
     display:inline-block;
     padding:7px 12px;
     border-radius:30px;
     font-size:12px;
-    font-weight:600;
+    font-weight:700;
+    color:#0d6efd;
+    background:#eef4ff;
+    margin-bottom:12px;
+}
+
+/* footer info line */
+.info{
+    font-size:12px;
+    color:#888;
     margin-top:10px;
-}
-
-.active{
-    background:#e8fff1;
-    color:#198754;
-}
-
-.pending{
-    background:#fff4d6;
-    color:#b8860b;
-}
-
-.inactive{
-    background:#ffe5e5;
-    color:#dc3545;
 }
 
 /* ================= DRAWER ================= */
@@ -255,8 +259,8 @@ body{
          src="https://cdn-icons-png.flaticon.com/512/3774/3774299.png">
 
     <div class="header-center">
-        <h1>Welcome <?php echo htmlspecialchars($user['firstname'] ?? 'User'); ?></h1>
-        <p>Medicare Dashboard</p>
+        <h1>Medicare System</h1>
+        <p>Find Trusted Doctors</p>
     </div>
 
     <div class="menu-btn" onclick="openMenu()">☰</div>
@@ -279,8 +283,8 @@ body{
 
 <!-- PAGE HEADER -->
 <div class="page-header">
-    <h1>Partner Hospitals</h1>
-    <p>Browse healthcare facilities and consultation details</p>
+    <h1>Doctors Directory</h1>
+    <p>Browse specialists and healthcare professionals</p>
 </div>
 
 <!-- GRID -->
@@ -289,53 +293,52 @@ body{
 <?php while($row = $res->fetch_assoc()) { ?>
 
 <?php
-$status = strtolower($row['hospital_payment_status'] ?? '');
-
-$statusClass = "inactive";
-if ($status === "active") {
-    $statusClass = "active";
-} elseif ($status === "pending") {
-    $statusClass = "pending";
-}
+$first = $row['first_name'] ?? '';
+$last  = $row['last_name'] ?? '';
+$initials = strtoupper(substr($first,0,1).substr($last,0,1));
 ?>
 
+<a href="view_doctor_detail.php?doctor_id=<?php echo $row['doctor_id']; ?>" style="text-decoration:none;color:inherit;">
     <div class="card">
 
-        <div class="hospital-name">
-            <?php echo htmlspecialchars($row['hospital_name']); ?>
+        <div class="avatar">
+            <?php echo $initials; ?>
         </div>
 
-        <div class="location">
-            📍 <?php echo htmlspecialchars($row['hospital_location']); ?>
+        <div class="doctor-name">
+            <?php echo htmlspecialchars($first . " " . $last); ?>
         </div>
 
-        <div class="fee">
-            Consultation Fee: KSh
-            <?php echo number_format($row['hospital_consultancy_fee']); ?>
+        <div class="specialization">
+            <?php echo htmlspecialchars($row['specialization']); ?>
         </div>
 
-        <div>
-            <span class="status <?php echo $statusClass; ?>">
-                <?php echo htmlspecialchars($row['hospital_payment_status']); ?>
-            </span>
+        <div class="hospital">
+            🏥 <?php echo htmlspecialchars($row['hospital_name']); ?>
+        </div>
+
+        <div class="info">
+            Click to view availability
         </div>
 
     </div>
-
+</a>
 <?php } ?>
 
 </div>
 
 <script>
+
 function openMenu(){
     document.getElementById("drawer").classList.add("open");
-    document.getElementById("overlay").style.display = "block";
+    document.getElementById("overlay").style.display="block";
 }
 
 function closeMenu(){
     document.getElementById("drawer").classList.remove("open");
-    document.getElementById("overlay").style.display = "none";
+    document.getElementById("overlay").style.display="none";
 }
+
 </script>
 
 </body>
