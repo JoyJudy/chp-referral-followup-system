@@ -1,10 +1,28 @@
 <?php
-require_once __DIR__ . '/../../../config/db.php';
-require_once __DIR__ . '/../../../includes/auth_check.php';
+require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../../includes/auth_check.php';
 require_role(['admin']);
 
 /* ================= GET USER ================= */
 $user = $currentUser;
+
+$addMsg = "";
+
+if (isset($_POST['add_hospital'])) {
+
+    $name = trim($_POST['hospital_name'] ?? '');
+    $location = trim($_POST['location'] ?? '');
+    $phone = trim($_POST['phone_number'] ?? '');
+
+    if ($name === '') {
+        $addMsg = "Hospital name is required";
+    } else {
+        $stmt = $conn->prepare("INSERT INTO hospitals(hospital_name, location, phone_number) VALUES (?, ?, ?)");
+        $stmt->bind_param("sss", $name, $location, $phone);
+        $stmt->execute();
+        $addMsg = "Hospital added.";
+    }
+}
 
 /* ================= FETCH HOSPITALS ================= */
 $res = $conn->query("
@@ -279,6 +297,20 @@ body{
     <p>Browse healthcare facilities and consultation details</p>
 </div>
 
+<?php if (!empty($addMsg)): ?>
+    <p style="text-align:center;color:#0b6e0b;font-size:13px;margin-bottom:10px;"><?php echo htmlspecialchars($addMsg); ?></p>
+<?php endif; ?>
+
+<div style="max-width:500px;margin:0 auto 20px;background:#fff;border-radius:16px;padding:20px;box-shadow:0 10px 25px rgba(0,0,0,0.06);">
+    <h3 style="margin-bottom:12px;font-size:15px;">Add Hospital</h3>
+    <form method="POST" style="display:flex;flex-direction:column;gap:8px;">
+        <input type="text" name="hospital_name" placeholder="Hospital Name" required style="padding:10px;border-radius:8px;border:1px solid #ddd;">
+        <input type="text" name="location" placeholder="Location" style="padding:10px;border-radius:8px;border:1px solid #ddd;">
+        <input type="text" name="phone_number" placeholder="Phone Number" style="padding:10px;border-radius:8px;border:1px solid #ddd;">
+        <button type="submit" name="add_hospital" style="padding:10px;border:none;border-radius:8px;background:#111;color:#fff;font-weight:600;cursor:pointer;">Add Hospital</button>
+    </form>
+</div>
+
 <!-- GRID -->
 <div class="container">
 
@@ -297,6 +329,8 @@ body{
         <div class="location">
             📞 <?php echo htmlspecialchars($row['phone_number']); ?>
         </div>
+
+        <a href="edit_hospital.php?hospital_id=<?php echo $row['hospital_id']; ?>" style="display:inline-block;margin-top:8px;font-size:13px;color:#0d6efd;text-decoration:none;">Edit</a>
 
     </div>
 
