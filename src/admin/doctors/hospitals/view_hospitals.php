@@ -1,19 +1,15 @@
 <?php
-session_start();
-require_once __DIR__ . '/../shared/db.php';
-
-if (!isset($_SESSION['user'])) {
-    header("Location: login.php");
-    exit();
-}
+require_once __DIR__ . '/../../../config/db.php';
+require_once __DIR__ . '/../../../includes/auth_check.php';
+require_role(['admin']);
 
 /* ================= GET USER ================= */
-$user = $_SESSION['user'];
+$user = $currentUser;
 
 /* ================= FETCH HOSPITALS ================= */
 $res = $conn->query("
-    SELECT *
-    FROM mc_hospital
+    SELECT hospital_id, hospital_name, location, phone_number
+    FROM hospitals
     ORDER BY hospital_name ASC
 ");
 ?>
@@ -255,7 +251,7 @@ body{
          src="https://cdn-icons-png.flaticon.com/512/3774/3774299.png">
 
     <div class="header-center">
-        <h1>Welcome <?php echo htmlspecialchars($user['firstname'] ?? 'User'); ?></h1>
+        <h1>Welcome <?php echo htmlspecialchars($user['first_name'] ?? 'User'); ?></h1>
         <p>Medicare Dashboard</p>
     </div>
 
@@ -288,17 +284,6 @@ body{
 
 <?php while($row = $res->fetch_assoc()) { ?>
 
-<?php
-$status = strtolower($row['hospital_payment_status'] ?? '');
-
-$statusClass = "inactive";
-if ($status === "active") {
-    $statusClass = "active";
-} elseif ($status === "pending") {
-    $statusClass = "pending";
-}
-?>
-
     <div class="card">
 
         <div class="hospital-name">
@@ -306,18 +291,11 @@ if ($status === "active") {
         </div>
 
         <div class="location">
-            📍 <?php echo htmlspecialchars($row['hospital_location']); ?>
+            📍 <?php echo htmlspecialchars($row['location']); ?>
         </div>
 
-        <div class="fee">
-            Consultation Fee: KSh
-            <?php echo number_format($row['hospital_consultancy_fee']); ?>
-        </div>
-
-        <div>
-            <span class="status <?php echo $statusClass; ?>">
-                <?php echo htmlspecialchars($row['hospital_payment_status']); ?>
-            </span>
+        <div class="location">
+            📞 <?php echo htmlspecialchars($row['phone_number']); ?>
         </div>
 
     </div>

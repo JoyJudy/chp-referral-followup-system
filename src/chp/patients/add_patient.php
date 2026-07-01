@@ -1,10 +1,6 @@
 <?php
-session_start();
-
-if (!isset($_SESSION['user'])) {
-    header("Location: login.php");
-    exit();
-}
+require_once __DIR__ . '/../../includes/auth_check.php';
+require_role(['chp', 'admin']);
 ?>
 
 <!DOCTYPE html>
@@ -144,31 +140,26 @@ button:hover{
 
         <div>
             <label>Phone Number</label>
-            <input type="text" name="phone" required>
+            <input type="text" name="phone">
         </div>
 
         <div>
             <label>Gender</label>
-            <select name="gender" required>
+            <select name="gender">
                 <option value="">Select</option>
-                <option>Male</option>
-                <option>Female</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
             </select>
         </div>
 
     </div>
 
-    <label>Age</label>
-    <input type="number" name="age" required>
+    <label>Date of Birth</label>
+    <input type="date" name="date_of_birth">
 
     <label>Address</label>
     <textarea name="address" rows="3"></textarea>
-
-    <label>Medical Condition</label>
-    <input type="text" name="condition">
-
-    <label>Notes</label>
-    <textarea name="notes" rows="4"></textarea>
 
     <button type="submit">Save Patient</button>
 
