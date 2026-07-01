@@ -155,21 +155,25 @@ button{padding:8px 12px;border:none;border-radius:8px;cursor:pointer;font-weight
                 </td>
                 <td><span class="status-badge status-<?php echo $row['status']; ?>"><?php echo htmlspecialchars($row['status']); ?></span></td>
                 <td>
-                    <?php if ($row['status'] === 'active'): ?>
-                        <form method="POST" style="display:inline;">
-                            <input type="hidden" name="deactivate_user_id" value="<?php echo $row['user_id']; ?>">
-                            <button type="submit" class="deactivate-btn">Deactivate</button>
-                        </form>
+                    <?php if ((int) $row['user_id'] === (int) $currentUser['user_id']): ?>
+                        <em>This is your account</em>
                     <?php else: ?>
-                        <form method="POST" style="display:inline;">
-                            <input type="hidden" name="reactivate_user_id" value="<?php echo $row['user_id']; ?>">
-                            <button type="submit" class="reactivate-btn">Reactivate</button>
+                        <?php if ($row['status'] === 'active'): ?>
+                            <form method="POST" style="display:inline;">
+                                <input type="hidden" name="deactivate_user_id" value="<?php echo $row['user_id']; ?>">
+                                <button type="submit" class="deactivate-btn">Deactivate</button>
+                            </form>
+                        <?php else: ?>
+                            <form method="POST" style="display:inline;">
+                                <input type="hidden" name="reactivate_user_id" value="<?php echo $row['user_id']; ?>">
+                                <button type="submit" class="reactivate-btn">Reactivate</button>
+                            </form>
+                        <?php endif; ?>
+                        <form method="POST" style="display:inline;" onsubmit="return confirm('Permanently delete this account?');">
+                            <input type="hidden" name="delete_user_id" value="<?php echo $row['user_id']; ?>">
+                            <button type="submit" class="delete-btn">Delete</button>
                         </form>
                     <?php endif; ?>
-                    <form method="POST" style="display:inline;" onsubmit="return confirm('Permanently delete this account?');">
-                        <input type="hidden" name="delete_user_id" value="<?php echo $row['user_id']; ?>">
-                        <button type="submit" class="delete-btn">Delete</button>
-                    </form>
                 </td>
             </tr>
         <?php endwhile; ?>
