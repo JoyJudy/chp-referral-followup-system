@@ -310,11 +310,11 @@ input{
 <!-- DRAWER -->
 <div class="drawer" id="drawer">
 
-    <a href="dashboard.php">Home</a>
-    <a href="view_hospitals.php">Hospitals</a>
-    <a href="view_doctors.php">Doctors</a>
-    <a href="view_appointments.php">Appointments</a>
-    <a href="logout.php">Logout</a>
+    <a href="/src/admin/doctors/dashboard.php">Home</a>
+    <a href="/src/admin/doctors/hospitals/view_hospitals.php">Hospitals</a>
+    <a href="/src/admin/doctors/view_doctors.php">Doctors</a>
+    <a href="/src/doctor/appointments/view_appointments.php">Appointments</a>
+    <a href="/src/auth/logout.php">Logout</a>
 
 </div>
 
@@ -380,7 +380,7 @@ input{
 
         <h3>Book Appointment</h3>
 
-        <form method="POST" action="book_appointment.php">
+        <form method="POST" action="/src/doctor/appointments/book_appointment.php">
 
             <label>Referral</label>
             <select name="referral_id" required>
@@ -413,6 +413,16 @@ function openModal(){
 
 function closeModal(){
     document.getElementById("modal").style.display="none";
+}
+
+function openMenu(){
+    document.getElementById("drawer").classList.add("open");
+    document.getElementById("overlay").style.display="block";
+}
+
+function closeMenu(){
+    document.getElementById("drawer").classList.remove("open");
+    document.getElementById("overlay").style.display="none";
 }
 
 </script>

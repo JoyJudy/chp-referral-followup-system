@@ -8,8 +8,7 @@ $date = $_POST['date'];
 $time = $_POST['time'];
 
 /* ================= RESOLVE DOCTOR FROM REFERRAL ================= */
-/* The doctor is taken from the referral itself (not a posted field), so a
-   doctor can't book an appointment onto a referral that wasn't routed to them. */
+/* The doctor is taken from the referral itself, not a posted field, so it can't be forged by the client. */
 $referralStmt = $conn->prepare("SELECT doctor_id FROM referrals WHERE referral_id = ?");
 $referralStmt->bind_param("i", $referral_id);
 $referralStmt->execute();
@@ -20,6 +19,19 @@ if (!$referral || !$referral['doctor_id']) {
 }
 
 $doctor_id = $referral['doctor_id'];
+
+/* Doctors may only book appointments for referrals actually routed to them;
+   admins can book on behalf of any doctor. */
+if ($currentUser['role'] === 'doctor') {
+    $ownDoctorStmt = $conn->prepare("SELECT doctor_id FROM doctors WHERE user_id = ?");
+    $ownDoctorStmt->bind_param("i", $currentUser['user_id']);
+    $ownDoctorStmt->execute();
+    $ownDoctorRow = $ownDoctorStmt->get_result()->fetch_assoc();
+
+    if (!$ownDoctorRow || (int) $ownDoctorRow['doctor_id'] !== (int) $doctor_id) {
+        die("You can only book appointments for your own referrals.");
+    }
+}
 
 /* ================= CHECK CONFLICT ================= */
 $check = $conn->prepare("
@@ -47,6 +59,10 @@ $stmt = $conn->prepare("
 $stmt->bind_param("iiss", $referral_id, $doctor_id, $date, $time);
 $stmt->execute();
 
-header("Location: /src/admin/doctors/view_doctor_detail.php?doctor_id=" . $doctor_id);
+if ($currentUser['role'] === 'admin') {
+    header("Location: /src/admin/doctors/view_doctor_detail.php?doctor_id=" . $doctor_id);
+} else {
+    header("Location: /src/doctor/appointments/view_appointments.php");
+}
 exit();
 ?>

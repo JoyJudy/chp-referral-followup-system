@@ -24,7 +24,12 @@ body{background:linear-gradient(135deg,#f5f6fa,#eef1f7);color:#222;}
 <div class="content">
     <h2>Welcome, <?php echo htmlspecialchars($currentUser['first_name'] . ' ' . $currentUser['last_name']); ?></h2>
     <p>Role: <?php echo htmlspecialchars($currentUser['role']); ?></p>
-    <p style="margin-top:20px;"><a href="/src/admin/users/pending_users.php">Review pending account approvals</a></p>
+    <ul style="margin-top:20px;line-height:2;">
+        <li><a href="/src/admin/users/pending_users.php">Review pending account approvals</a></li>
+        <li><a href="/src/admin/users/manage_users.php">Manage active accounts</a></li>
+        <li><a href="/src/admin/doctors/hospitals/view_hospitals.php">Manage hospitals</a></li>
+        <li><a href="/src/admin/analytics.php">View analytics</a></li>
+    </ul>
 </div>
 
 </body>
