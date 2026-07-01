@@ -42,24 +42,31 @@ if (isset($_POST['register'])) {
 
             $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
 
-            $stmt = $conn->prepare("
-                INSERT INTO users(first_name, last_name, email, phone_number, password, role, status)
-                VALUES(?, ?, ?, ?, ?, ?, 'pending')
-            ");
+            $conn->begin_transaction();
+            try {
+                $stmt = $conn->prepare("
+                    INSERT INTO users(first_name, last_name, email, phone_number, password, role, status)
+                    VALUES(?, ?, ?, ?, ?, ?, 'pending')
+                ");
 
-            $stmt->bind_param("ssssss", $fn, $ln, $email, $phone, $hashedPassword, $role);
-            $stmt->execute();
+                $stmt->bind_param("ssssss", $fn, $ln, $email, $phone, $hashedPassword, $role);
+                $stmt->execute();
 
-            if ($role === 'doctor') {
-                $newUserId = $conn->insert_id;
-                $hospitalIdInt = (int) $hospitalId;
-                $doctorStmt = $conn->prepare("INSERT INTO doctors(user_id, hospital_id, specialization) VALUES (?, ?, ?)");
-                $doctorStmt->bind_param("iis", $newUserId, $hospitalIdInt, $specialization);
-                $doctorStmt->execute();
+                if ($role === 'doctor') {
+                    $newUserId = $conn->insert_id;
+                    $hospitalIdInt = (int) $hospitalId;
+                    $doctorStmt = $conn->prepare("INSERT INTO doctors(user_id, hospital_id, specialization) VALUES (?, ?, ?)");
+                    $doctorStmt->bind_param("iis", $newUserId, $hospitalIdInt, $specialization);
+                    $doctorStmt->execute();
+                }
+
+                $conn->commit();
+                $msg = "Registration submitted. Your account is pending admin approval before you can log in.";
+                $msgType = "success";
+            } catch (mysqli_sql_exception $e) {
+                $conn->rollback();
+                $msg = "Registration failed due to a server error. Please try again.";
             }
-
-            $msg = "Registration submitted. Your account is pending admin approval before you can log in.";
-            $msgType = "success";
         }
     }
 }

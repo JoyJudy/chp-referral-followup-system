@@ -283,11 +283,11 @@ body{
 <!-- DRAWER -->
 <div class="drawer" id="drawer">
 
-    <a href="dashboard.php">Home</a>
-    <a href="view_hospitals.php">Hospitals</a>
-    <a href="view_doctors.php">Doctors</a>
-    <a href="view_appointments.php">Appointments</a>
-    <a href="logout.php">Logout</a>
+    <a href="/src/admin/doctors/dashboard.php">Home</a>
+    <a href="/src/admin/doctors/hospitals/view_hospitals.php">Hospitals</a>
+    <a href="/src/admin/doctors/view_doctors.php">Doctors</a>
+    <a href="/src/doctor/appointments/view_appointments.php">Appointments</a>
+    <a href="/src/auth/logout.php">Logout</a>
 
 </div>
 

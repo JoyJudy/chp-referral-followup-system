@@ -18,15 +18,25 @@ if (isset($_POST['approve_user_id'])) {
 
     $userId = (int) $_POST['reject_user_id'];
 
-    $deleteDoctor = $conn->prepare("DELETE FROM doctors WHERE user_id = ?");
-    $deleteDoctor->bind_param("i", $userId);
-    $deleteDoctor->execute();
+    $check = $conn->prepare("SELECT status FROM users WHERE user_id = ?");
+    $check->bind_param("i", $userId);
+    $check->execute();
+    $statusRow = $check->get_result()->fetch_assoc();
 
-    $deleteUser = $conn->prepare("DELETE FROM users WHERE user_id = ? AND status = 'pending'");
-    $deleteUser->bind_param("i", $userId);
-    $deleteUser->execute();
+    if ($statusRow && $statusRow['status'] === 'pending') {
 
-    $msg = "Account rejected and removed.";
+        $deleteDoctor = $conn->prepare("DELETE FROM doctors WHERE user_id = ?");
+        $deleteDoctor->bind_param("i", $userId);
+        $deleteDoctor->execute();
+
+        $deleteUser = $conn->prepare("DELETE FROM users WHERE user_id = ? AND status = 'pending'");
+        $deleteUser->bind_param("i", $userId);
+        $deleteUser->execute();
+
+        $msg = "Account rejected and removed.";
+    } else {
+        $msg = "Account is no longer pending.";
+    }
 }
 
 $pending = $conn->query("
@@ -97,7 +107,7 @@ button{padding:8px 14px;border:none;border-radius:8px;cursor:pointer;font-weight
                 <td><?php echo htmlspecialchars($row['role']); ?></td>
                 <td>
                     <?php if ($row['role'] === 'doctor'): ?>
-                        <?php echo htmlspecialchars($row['hospital_name'] . ' — ' . $row['specialization']); ?>
+                        <?php echo htmlspecialchars(($row['hospital_name'] ?? '') . ' — ' . ($row['specialization'] ?? '')); ?>
                     <?php else: ?>
                         &mdash;
                     <?php endif; ?>

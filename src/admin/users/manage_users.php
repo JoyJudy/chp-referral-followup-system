@@ -148,7 +148,7 @@ button{padding:8px 12px;border:none;border-radius:8px;cursor:pointer;font-weight
                 <td><?php echo htmlspecialchars($row['role']); ?></td>
                 <td>
                     <?php if ($row['role'] === 'doctor'): ?>
-                        <?php echo htmlspecialchars($row['hospital_name'] . ' — ' . $row['specialization']); ?>
+                        <?php echo htmlspecialchars(($row['hospital_name'] ?? '') . ' — ' . ($row['specialization'] ?? '')); ?>
                     <?php else: ?>
                         &mdash;
                     <?php endif; ?>
