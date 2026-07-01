@@ -1,39 +1,50 @@
 <?php
 session_start();
-require_once __DIR__ . '/../shared/db.php';
+require_once __DIR__ . '/../config/db.php';
 
 $msg = "";
-$loginData = null;
 
 if(isset($_POST['login'])){
 
-    $nid = trim($_POST['national_id_number']);
     $phone = trim($_POST['user_phonenumber']);
+    $password = $_POST['password'];
 
     $stmt = $conn->prepare("
         SELECT *
         FROM users
-        WHERE national_id_number = ?
-        AND user_phonenumber = ?
+        WHERE phone_number = ?
         LIMIT 1
     ");
 
-    $stmt->bind_param("ss", $nid, $phone);
+    $stmt->bind_param("s", $phone);
     $stmt->execute();
 
     $result = $stmt->get_result();
+    $user = $result->fetch_assoc();
 
-    if($result->num_rows > 0){
+    if($user && password_verify($password, $user['password']) && $user['status'] !== 'active'){
 
-        $user = $result->fetch_assoc();
+        $msg = "Your account is pending admin approval.";
 
+    }elseif($user && password_verify($password, $user['password'])){
+
+        unset($user['password']);
         $_SESSION['user'] = $user;
 
-        $loginData = $user;
+        $redirects = [
+            'admin'  => '/src/admin/doctors/dashboard.php',
+            'doctor' => '/src/doctor/appointments/dashboard.php',
+            'chp'    => '/src/chp/patients/dashboard.php',
+        ];
+
+        $target = $redirects[$user['role']] ?? '/src/auth/login.php';
+
+        header("Location: " . $target);
+        exit();
 
     }else{
 
-        $msg = "Invalid National ID or Phone Number";
+        $msg = "Invalid phone number or password";
 
     }
 }
@@ -191,6 +202,36 @@ button:hover{
     font-size:12px;
 }
 
+/* ================= PASSWORD TOGGLE ================= */
+
+.password-field{
+    position:relative;
+}
+
+.password-field input{
+    padding-right:56px;
+}
+
+.toggle-password{
+    position:absolute;
+    right:6px;
+    top:50%;
+    transform:translateY(-50%);
+    width:auto;
+    margin:0;
+    padding:6px 8px;
+    background:none;
+    border:none;
+    color:#555;
+    font-size:12px;
+    font-weight:600;
+    cursor:pointer;
+}
+
+.toggle-password:hover{
+    color:#111;
+}
+
 </style>
 </head>
 
@@ -218,7 +259,7 @@ button:hover{
 
         <?php if(!empty($msg)): ?>
             <div class="error">
-                <?php echo $msg; ?>
+                <?php echo htmlspecialchars($msg); ?>
             </div>
         <?php endif; ?>
 
@@ -226,17 +267,20 @@ button:hover{
 
             <input
                 type="text"
-                name="national_id_number"
-                placeholder="National ID Number"
-                required
-            >
-
-            <input
-                type="text"
                 name="user_phonenumber"
                 placeholder="Phone Number"
                 required
             >
+
+            <div class="password-field">
+                <input
+                    type="password"
+                    name="password"
+                    placeholder="Password"
+                    required
+                >
+                <button type="button" class="toggle-password" onclick="togglePasswordVisibility(this)">Show</button>
+            </div>
 
             <button
                 type="submit"
@@ -254,6 +298,10 @@ button:hover{
             No account? Register
         </a>
 
+        <div class="small-text" style="margin-top:12px;">
+            <a href="forgot_password.php" style="color:#555;text-decoration:none;">Forgot password?</a>
+        </div>
+
         <div class="small-text">
             Access your healthcare dashboard securely
         </div>
@@ -262,62 +310,14 @@ button:hover{
 
 </div>
 
-<?php if($loginData): ?>
-
 <script>
-
-let userData =
-<?php echo json_encode($loginData); ?>;
-
-// Save every database field
-
-for(let key in userData){
-
-    localStorage.setItem(
-        key,
-        userData[key]
-    );
-
+function togglePasswordVisibility(button) {
+    const input = button.previousElementSibling;
+    const isHidden = input.type === 'password';
+    input.type = isHidden ? 'text' : 'password';
+    button.textContent = isHidden ? 'Hide' : 'Show';
 }
-
-// Additional fields
-
-localStorage.setItem(
-    "fullname",
-    userData.firstname + " " + userData.lastname
-);
-
-localStorage.setItem(
-    "logged_in",
-    "1"
-);
-
-// Redirect based on role
-
-if(userData.role === "admin"){
-
-    window.location.href = "admin/dashboard.php";
-
-}
-else if(userData.role === "doctor"){
-
-    window.location.href = "doctor/dashboard.php";
-
-}
-else if(userData.role === "chp"){
-
-    window.location.href = "chp/dashboard.php";
-
-}
-else{
-
-    window.location.href = "dashboard.php";
-
-}
-
 </script>
-
-<?php endif; ?>
 
 </body>
 </html>

@@ -1,11 +1,7 @@
 <?php
-session_start();
-require_once __DIR__ . '/../shared/db.php';
-
-if (!isset($_SESSION['user'])) {
-    header("Location: login.php");
-    exit();
-}
+require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../../includes/auth_check.php';
+require_role(['admin']);
 
 if (!isset($_GET['doctor_id'])) {
     die("Doctor not found");
@@ -14,7 +10,13 @@ if (!isset($_GET['doctor_id'])) {
 $doctor_id = intval($_GET['doctor_id']);
 
 /* ================= DOCTOR ================= */
-$stmt = $conn->prepare("SELECT * FROM doctor_table WHERE doctor_id = ?");
+$stmt = $conn->prepare("
+    SELECT d.doctor_id, u.first_name, u.last_name, d.specialization, h.hospital_name
+    FROM doctors d
+    JOIN users u ON d.user_id = u.user_id
+    JOIN hospitals h ON d.hospital_id = h.hospital_id
+    WHERE d.doctor_id = ?
+");
 $stmt->bind_param("i", $doctor_id);
 $stmt->execute();
 $doctor = $stmt->get_result()->fetch_assoc();
@@ -25,15 +27,32 @@ if (!$doctor) {
 
 /* ================= APPOINTMENTS ================= */
 $res = $conn->prepare("
-    SELECT *
-    FROM doctor_appointments
-    WHERE doctor_id = ?
-    ORDER BY appointment_date ASC, appointment_time_start ASC
+    SELECT a.appointment_id, a.appointment_date, a.appointment_time, a.status,
+           p.first_name AS patient_first, p.last_name AS patient_last
+    FROM appointments a
+    JOIN referrals r ON a.referral_id = r.referral_id
+    JOIN patients p ON r.patient_id = p.patient_id
+    WHERE a.doctor_id = ?
+    ORDER BY a.appointment_date ASC, a.appointment_time ASC
 ");
 
 $res->bind_param("i", $doctor_id);
 $res->execute();
 $appointments = $res->get_result();
+
+/* ================= REFERRALS AWAITING AN APPOINTMENT ================= */
+$referralsStmt = $conn->prepare("
+    SELECT r.referral_id, r.reason, r.referral_date, p.first_name AS patient_first, p.last_name AS patient_last
+    FROM referrals r
+    JOIN patients p ON r.patient_id = p.patient_id
+    WHERE r.doctor_id = ?
+    AND r.status NOT IN ('rejected', 'completed')
+    AND NOT EXISTS (SELECT 1 FROM appointments a WHERE a.referral_id = r.referral_id)
+    ORDER BY r.referral_date ASC
+");
+$referralsStmt->bind_param("i", $doctor_id);
+$referralsStmt->execute();
+$pendingReferrals = $referralsStmt->get_result();
 ?>
 
 <!DOCTYPE html>
@@ -319,22 +338,22 @@ input{
 
     <div>
         <div class="time">
-            <?php echo $row['appointment_time_start']; ?> - <?php echo $row['appointment_time_end']; ?>
+            <?php echo htmlspecialchars($row['patient_first'] . ' ' . $row['patient_last']); ?> — <?php echo $row['appointment_time']; ?>
         </div>
         <div class="date">
             <?php echo $row['appointment_date']; ?>
         </div>
     </div>
 
-    <div class="status scheduled">
-        Booked
+    <div class="status <?php echo htmlspecialchars($row['status']); ?>">
+        <?php echo htmlspecialchars(ucfirst($row['status'])); ?>
     </div>
 
 </div>
 
 <?php } ?>
 
-<!-- AVAILABLE SLOT (EXAMPLE) -->
+<!-- AVAILABLE SLOT -->
 <div class="available-slot">
 
     <div>
@@ -342,7 +361,11 @@ input{
         <div class="date">Click button on right to book appointment</div>
     </div>
 
-    <button class="book-btn" onclick="openModal()">Book</button>
+    <?php if ($pendingReferrals->num_rows > 0): ?>
+        <button class="book-btn" onclick="openModal()">Book</button>
+    <?php else: ?>
+        <span class="meta">No referrals awaiting scheduling</span>
+    <?php endif; ?>
 
 </div>
 
@@ -359,16 +382,20 @@ input{
 
         <form method="POST" action="book_appointment.php">
 
-            <input type="hidden" name="doctor_id" value="<?php echo $doctor_id; ?>">
+            <label>Referral</label>
+            <select name="referral_id" required>
+                <?php while ($referral = $pendingReferrals->fetch_assoc()): ?>
+                    <option value="<?php echo $referral['referral_id']; ?>">
+                        <?php echo htmlspecialchars($referral['patient_first'] . ' ' . $referral['patient_last'] . ' — ' . $referral['reason']); ?>
+                    </option>
+                <?php endwhile; ?>
+            </select>
 
             <label>Date</label>
             <input type="date" name="date" required>
 
-            <label>Start Time</label>
-            <input type="time" name="start_time" required>
-
-            <label>End Time</label>
-            <input type="time" name="end_time" required>
+            <label>Time</label>
+            <input type="time" name="time" required>
 
             <button class="submit-btn" type="submit">Confirm Booking</button>
 

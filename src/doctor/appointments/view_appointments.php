@@ -1,17 +1,41 @@
 <?php
-session_start();
-require_once __DIR__ . '/../shared/db.php';
+require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../../includes/auth_check.php';
+require_role(['doctor', 'admin']);
 
-if (!isset($_SESSION['user'])) {
-    header("Location: login.php");
-    exit();
+/* Doctors only see their own appointments; admins see every appointment. */
+if ($currentUser['role'] === 'doctor') {
+
+    $doctorLookup = $conn->prepare("SELECT doctor_id FROM doctors WHERE user_id = ?");
+    $doctorLookup->bind_param("i", $currentUser['user_id']);
+    $doctorLookup->execute();
+    $doctorRow = $doctorLookup->get_result()->fetch_assoc();
+    $doctorId = $doctorRow['doctor_id'] ?? 0;
+
+    $stmt = $conn->prepare("
+        SELECT a.appointment_date, a.appointment_time, a.status,
+               p.first_name AS patient_first, p.last_name AS patient_last
+        FROM appointments a
+        JOIN referrals r ON a.referral_id = r.referral_id
+        JOIN patients p ON r.patient_id = p.patient_id
+        WHERE a.doctor_id = ?
+        ORDER BY a.appointment_date DESC
+    ");
+    $stmt->bind_param("i", $doctorId);
+    $stmt->execute();
+    $res = $stmt->get_result();
+
+} else {
+
+    $res = $conn->query("
+        SELECT a.appointment_date, a.appointment_time, a.status,
+               p.first_name AS patient_first, p.last_name AS patient_last
+        FROM appointments a
+        JOIN referrals r ON a.referral_id = r.referral_id
+        JOIN patients p ON r.patient_id = p.patient_id
+        ORDER BY a.appointment_date DESC
+    ");
 }
-
-$res = $conn->query("
-    SELECT *
-    FROM doctor_appointments
-    ORDER BY appointment_date DESC
-");
 ?>
 
 <!DOCTYPE html>
@@ -213,12 +237,12 @@ body{
 }
 
 /* STATUS COLORS */
-.pending{
+.scheduled{
     background:#fff4d6;
     color:#b8860b;
 }
 
-.confirmed{
+.completed{
     background:#e8fff1;
     color:#198754;
 }
@@ -301,11 +325,7 @@ $currentDate = "";
 
 <?php
 $date = $row['appointment_date'];
-$status = strtolower($row['status']);
-
-$statusClass = "pending";
-if ($status === "confirmed") $statusClass = "confirmed";
-elseif ($status === "cancelled") $statusClass = "cancelled";
+$statusClass = strtolower($row['status']); // scheduled | completed | cancelled
 ?>
 
 <?php if ($date !== $currentDate) { ?>
@@ -323,10 +343,10 @@ $currentDate = $date;
 
         <div class="left">
             <div class="patient">
-                👤 <?php echo htmlspecialchars($row['patient_name']); ?>
+                👤 <?php echo htmlspecialchars($row['patient_first'] . ' ' . $row['patient_last']); ?>
             </div>
             <div class="meta">
-                Appointment booking record
+                <?php echo htmlspecialchars($row['appointment_time']); ?>
             </div>
         </div>
 

@@ -1,36 +1,70 @@
 <?php
-require_once __DIR__ . '/../shared/db.php';
+require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/password_rules.php';
 
 $msg = "";
+$msgType = "error";
+
+$allowedRoles = ['admin', 'chp', 'doctor'];
 
 if (isset($_POST['register'])) {
 
-    $fn = $_POST['firstname'];
-    $ln = $_POST['lastname'];
-    $nid = $_POST['national_id_number'];
-    $email = $_POST['email'];
-    $phone = $_POST['user_phonenumber'];
+    $fn = trim($_POST['firstname'] ?? '');
+    $ln = trim($_POST['lastname'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $phone = trim($_POST['user_phonenumber'] ?? '');
+    $role = $_POST['role'] ?? '';
+    $password = $_POST['password'] ?? '';
+    $confirmPassword = $_POST['confirm_password'] ?? '';
+    $hospitalId = $_POST['hospital_id'] ?? '';
+    $specialization = trim($_POST['specialization'] ?? '');
 
-    $check = $conn->prepare("SELECT id FROM users WHERE national_id_number=? OR user_phonenumber=?");
-    $check->bind_param("ss", $nid, $phone);
-    $check->execute();
-    $res = $check->get_result();
-
-    if ($res->num_rows > 0) {
-        $msg = "User already exists";
+    if ($fn === '' || $ln === '' || $email === '' || $phone === '' || $role === '' || $password === '') {
+        $msg = "All fields are required";
+    } elseif (!in_array($role, $allowedRoles, true)) {
+        $msg = "Invalid role selected";
+    } elseif ($role === 'doctor' && ($hospitalId === '' || $specialization === '')) {
+        $msg = "Facility and specialization are required for doctors";
+    } elseif ($password !== $confirmPassword) {
+        $msg = "Passwords do not match";
+    } elseif (($passwordError = validate_password_strength($password)) !== null) {
+        $msg = $passwordError;
     } else {
 
-        $stmt = $conn->prepare("
-            INSERT INTO users(firstname, lastname, national_id_number, email, user_phonenumber)
-            VALUES(?,?,?,?,?)
-        ");
+        $check = $conn->prepare("SELECT user_id FROM users WHERE email = ? OR phone_number = ?");
+        $check->bind_param("ss", $email, $phone);
+        $check->execute();
+        $res = $check->get_result();
 
-        $stmt->bind_param("sssss", $fn, $ln, $nid, $email, $phone);
-        $stmt->execute();
+        if ($res->num_rows > 0) {
+            $msg = "An account with that email or phone number already exists";
+        } else {
 
-        $msg = "Registration successful";
+            $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+
+            $stmt = $conn->prepare("
+                INSERT INTO users(first_name, last_name, email, phone_number, password, role, status)
+                VALUES(?, ?, ?, ?, ?, ?, 'pending')
+            ");
+
+            $stmt->bind_param("ssssss", $fn, $ln, $email, $phone, $hashedPassword, $role);
+            $stmt->execute();
+
+            if ($role === 'doctor') {
+                $newUserId = $conn->insert_id;
+                $hospitalIdInt = (int) $hospitalId;
+                $doctorStmt = $conn->prepare("INSERT INTO doctors(user_id, hospital_id, specialization) VALUES (?, ?, ?)");
+                $doctorStmt->bind_param("iis", $newUserId, $hospitalIdInt, $specialization);
+                $doctorStmt->execute();
+            }
+
+            $msg = "Registration submitted. Your account is pending admin approval before you can log in.";
+            $msgType = "success";
+        }
     }
 }
+
+$hospitals = $conn->query("SELECT hospital_id, hospital_name FROM hospitals ORDER BY hospital_name ASC");
 ?>
 
 <!DOCTYPE html>
@@ -108,7 +142,7 @@ body{
 }
 
 /* ================= INPUT ================= */
-input{
+input, select{
     width:100%;
     padding:12px;
     margin:8px 0;
@@ -116,9 +150,10 @@ input{
     border:1px solid #ddd;
     background:#fafafa;
     transition:0.2s;
+    font-size:14px;
 }
 
-input:focus{
+input:focus, select:focus{
     border-color:#111;
     background:#fff;
     outline:none;
@@ -181,6 +216,42 @@ button:hover{
     margin-top:10px;
 }
 
+.hint{
+    font-size:11px;
+    color:#888;
+    margin:-4px 0 8px;
+}
+
+/* ================= PASSWORD TOGGLE ================= */
+
+.password-field{
+    position:relative;
+}
+
+.password-field input{
+    padding-right:56px;
+}
+
+.toggle-password{
+    position:absolute;
+    right:6px;
+    top:50%;
+    transform:translateY(-50%);
+    width:auto;
+    margin:0;
+    padding:6px 8px;
+    background:none;
+    border:none;
+    color:#555;
+    font-size:12px;
+    font-weight:600;
+    cursor:pointer;
+}
+
+.toggle-password:hover{
+    color:#111;
+}
+
 </style>
 
 </head>
@@ -207,17 +278,50 @@ button:hover{
 <h3>Create Account</h3>
 
 <!-- MESSAGE -->
-<p class="<?php echo ($msg=="Registration successful") ? "success" : "error"; ?>">
-    <?php echo $msg; ?>
+<?php if (!empty($msg)): ?>
+<p class="<?php echo $msgType; ?>">
+    <?php echo htmlspecialchars($msg); ?>
 </p>
+<?php endif; ?>
 
 <form method="POST">
 
-<input name="firstname" placeholder="First Name" required>
-<input name="lastname" placeholder="Last Name" required>
-<input name="national_id_number" placeholder="National ID" required>
-<input name="email" placeholder="Email">
-<input name="user_phonenumber" placeholder="Phone" required>
+<input name="firstname" placeholder="First Name" value="<?php echo htmlspecialchars($_POST['firstname'] ?? ''); ?>" required>
+<input name="lastname" placeholder="Last Name" value="<?php echo htmlspecialchars($_POST['lastname'] ?? ''); ?>" required>
+<input type="email" name="email" placeholder="Email" value="<?php echo htmlspecialchars($_POST['email'] ?? ''); ?>" required>
+<input name="user_phonenumber" placeholder="Phone" value="<?php echo htmlspecialchars($_POST['user_phonenumber'] ?? ''); ?>" required>
+
+<select name="role" id="role" onchange="toggleDoctorFields(this.value)" required>
+    <option value="" disabled <?php echo empty($_POST['role']) ? 'selected' : ''; ?>>Select Role</option>
+    <option value="chp" <?php echo (($_POST['role'] ?? '') === 'chp') ? 'selected' : ''; ?>>Community Health Promoter</option>
+    <option value="doctor" <?php echo (($_POST['role'] ?? '') === 'doctor') ? 'selected' : ''; ?>>Doctor</option>
+    <option value="admin" <?php echo (($_POST['role'] ?? '') === 'admin') ? 'selected' : ''; ?>>Admin</option>
+</select>
+
+<div id="doctor-fields" style="display:<?php echo (($_POST['role'] ?? '') === 'doctor') ? 'block' : 'none'; ?>;">
+
+    <select name="hospital_id">
+        <option value="" disabled <?php echo empty($_POST['hospital_id']) ? 'selected' : ''; ?>>Select Facility</option>
+        <?php while ($hospital = $hospitals->fetch_assoc()): ?>
+            <option value="<?php echo $hospital['hospital_id']; ?>" <?php echo (($_POST['hospital_id'] ?? '') == $hospital['hospital_id']) ? 'selected' : ''; ?>>
+                <?php echo htmlspecialchars($hospital['hospital_name']); ?>
+            </option>
+        <?php endwhile; ?>
+    </select>
+
+    <input name="specialization" placeholder="Specialization (e.g. General Practice)" value="<?php echo htmlspecialchars($_POST['specialization'] ?? ''); ?>">
+
+</div>
+
+<div class="password-field">
+    <input type="password" name="password" placeholder="Password" required>
+    <button type="button" class="toggle-password" onclick="togglePasswordVisibility(this)">Show</button>
+</div>
+<div class="hint"><?php echo htmlspecialchars(PASSWORD_HINT); ?></div>
+<div class="password-field">
+    <input type="password" name="confirm_password" placeholder="Confirm Password" required>
+    <button type="button" class="toggle-password" onclick="togglePasswordVisibility(this)">Show</button>
+</div>
 
 <button name="register">Register</button>
 
@@ -235,6 +339,19 @@ button:hover{
 </div>
 
 </div>
+
+<script>
+function togglePasswordVisibility(button) {
+    const input = button.previousElementSibling;
+    const isHidden = input.type === 'password';
+    input.type = isHidden ? 'text' : 'password';
+    button.textContent = isHidden ? 'Hide' : 'Show';
+}
+
+function toggleDoctorFields(role) {
+    document.getElementById('doctor-fields').style.display = (role === 'doctor') ? 'block' : 'none';
+}
+</script>
 
 </body>
 </html>

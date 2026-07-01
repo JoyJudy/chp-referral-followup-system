@@ -1,13 +1,15 @@
 <?php
-session_start();
-require_once __DIR__ . '/../shared/db.php';
+require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../../includes/auth_check.php';
+require_role(['admin']);
 
-if (!isset($_SESSION['user'])) {
-    header("Location: login.php");
-    exit();
-}
-
-$res = $conn->query("SELECT * FROM doctor_table ORDER BY first_name ASC");
+$res = $conn->query("
+    SELECT d.doctor_id, u.first_name, u.last_name, d.specialization, h.hospital_name
+    FROM doctors d
+    JOIN users u ON d.user_id = u.user_id
+    JOIN hospitals h ON d.hospital_id = h.hospital_id
+    ORDER BY u.first_name ASC
+");
 ?>
 
 <!DOCTYPE html>
