@@ -8,10 +8,31 @@ $msg = "";
 if (isset($_POST['deactivate_user_id'])) {
 
     $userId = (int) $_POST['deactivate_user_id'];
-    $stmt = $conn->prepare("UPDATE users SET status = 'inactive' WHERE user_id = ? AND status = 'active'");
-    $stmt->bind_param("i", $userId);
-    $stmt->execute();
-    $msg = "Account deactivated.";
+
+    if ($userId === (int) $currentUser['user_id']) {
+        $msg = "You can't deactivate your own account while logged in.";
+    } else {
+
+        $target = $conn->prepare("SELECT role, status FROM users WHERE user_id = ?");
+        $target->bind_param("i", $userId);
+        $target->execute();
+        $targetRow = $target->get_result()->fetch_assoc();
+
+        $blockedAsLastAdmin = false;
+        if ($targetRow && $targetRow['role'] === 'admin' && $targetRow['status'] === 'active') {
+            $adminCount = $conn->query("SELECT COUNT(*) AS c FROM users WHERE role = 'admin' AND status = 'active'")->fetch_assoc()['c'];
+            $blockedAsLastAdmin = ((int) $adminCount <= 1);
+        }
+
+        if ($blockedAsLastAdmin) {
+            $msg = "Can't deactivate the last active admin account.";
+        } else {
+            $stmt = $conn->prepare("UPDATE users SET status = 'inactive' WHERE user_id = ? AND status = 'active'");
+            $stmt->bind_param("i", $userId);
+            $stmt->execute();
+            $msg = "Account deactivated.";
+        }
+    }
 
 } elseif (isset($_POST['reactivate_user_id'])) {
 
@@ -25,13 +46,33 @@ if (isset($_POST['deactivate_user_id'])) {
 
     $userId = (int) $_POST['delete_user_id'];
 
-    try {
-        $stmt = $conn->prepare("DELETE FROM users WHERE user_id = ?");
-        $stmt->bind_param("i", $userId);
-        $stmt->execute();
-        $msg = "Account deleted.";
-    } catch (mysqli_sql_exception $e) {
-        $msg = "Can't delete — this account has history (patients, referrals, or followups). Deactivate it instead.";
+    if ($userId === (int) $currentUser['user_id']) {
+        $msg = "You can't delete your own account while logged in.";
+    } else {
+
+        $target = $conn->prepare("SELECT role, status FROM users WHERE user_id = ?");
+        $target->bind_param("i", $userId);
+        $target->execute();
+        $targetRow = $target->get_result()->fetch_assoc();
+
+        $blockedAsLastAdmin = false;
+        if ($targetRow && $targetRow['role'] === 'admin' && $targetRow['status'] === 'active') {
+            $adminCount = $conn->query("SELECT COUNT(*) AS c FROM users WHERE role = 'admin' AND status = 'active'")->fetch_assoc()['c'];
+            $blockedAsLastAdmin = ((int) $adminCount <= 1);
+        }
+
+        if ($blockedAsLastAdmin) {
+            $msg = "Can't delete the last active admin account.";
+        } else {
+            try {
+                $stmt = $conn->prepare("DELETE FROM users WHERE user_id = ?");
+                $stmt->bind_param("i", $userId);
+                $stmt->execute();
+                $msg = "Account deleted.";
+            } catch (mysqli_sql_exception $e) {
+                $msg = "Can't delete — this account has history (patients, referrals, or followups). Deactivate it instead.";
+            }
+        }
     }
 }
 
