@@ -24,7 +24,11 @@ if(isset($_POST['login'])){
 
     if($user && password_verify($password, $user['password']) && $user['status'] !== 'active'){
 
-        $msg = "Your account is pending admin approval.";
+        if ($user['status'] === 'inactive') {
+            $msg = "Your account has been deactivated. Contact an admin.";
+        } else {
+            $msg = "Your account is pending admin approval.";
+        }
 
     }elseif($user && password_verify($password, $user['password'])){
 
